@@ -180,6 +180,9 @@ public class Utils {
             case "CORE":
                 serverUrl = context.getString(R.string.updater_server_url_core);
                 break;
+            case "MINI":
+                serverUrl = context.getString(R.string.updater_server_url_mini);
+                break;
             case "VANILLA":
             default:
                 serverUrl = context.getString(R.string.updater_server_url_vanilla);
