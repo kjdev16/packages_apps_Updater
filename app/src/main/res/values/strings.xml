@@ -31,7 +31,7 @@
           {device} - Device name
     -->
     <string name="updater_server_url_gapps" translatable="false">https://raw.githubusercontent.com/MistOS-Devices/official_devices/16/GAPPS/{device}.json</string>
-    <string name="updater_server_url_core" translatable="false">https://raw.githubusercontent.com/MistOS-Devices/official_devices/16/PICO/{device}.json</string>
+    <string name="updater_server_url_pico" translatable="false">https://raw.githubusercontent.com/MistOS-Devices/official_devices/16/PICO/{device}.json</string>
     <string name="updater_server_url_vanilla" translatable="false">https://raw.githubusercontent.com/MistOS-Devices/official_devices/16/VANILLA/{device}.json</string>
     <string name="updater_server_url_mini" translatable="false">https://raw.githubusercontent.com/MistOS-Devices/official_devices/16/MINI/{device}.json</string>
 
