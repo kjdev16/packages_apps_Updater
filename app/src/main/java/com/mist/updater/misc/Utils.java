@@ -46,18 +46,28 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Enumeration;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
 public class Utils {
 
     private static final String TAG = "Utils";
+    private static final SimpleDateFormat BRANCH_DATE_FORMAT;
+
+    static {
+        BRANCH_DATE_FORMAT = new SimpleDateFormat("d.M.yyyy", Locale.US);
+        BRANCH_DATE_FORMAT.setTimeZone(TimeZone.getTimeZone("UTC"));
+        BRANCH_DATE_FORMAT.setLenient(false);
+    }
 
     private static String mMaintainer;
     private static String mBuildType;
@@ -171,25 +181,10 @@ public class Utils {
     public static String getServerURL(Context context) {
         String device = SystemProperties.get(Constants.PROP_NEXT_DEVICE, SystemProperties.get(Constants.PROP_DEVICE));
         String packageType = SystemProperties.get(Constants.PROP_PACKAGE_TYPE);
-        String serverUrl;
+        String serverUrl = getServerUrlTemplate(context, packageType);
+        String branch = getNextBranchName();
 
-        switch (packageType) {
-            case "GAPPS":
-                serverUrl = context.getString(R.string.updater_server_url_gapps);
-                break;
-            case "PICO":
-                serverUrl = context.getString(R.string.updater_server_url_pico);
-                break;
-            case "MINI":
-                serverUrl = context.getString(R.string.updater_server_url_mini);
-                break;
-            case "VANILLA":
-            default:
-                serverUrl = context.getString(R.string.updater_server_url_vanilla);
-                break;
-        }
-
-        return serverUrl.replace("{device}", device);
+        return serverUrl.replace("{branch}", branch).replace("{device}", device);
     }
 
     public static String getUpgradeBlockedURL(Context context) {
@@ -201,7 +196,34 @@ public class Utils {
     public static String getChangelogURL(Context context) {
         String device = SystemProperties.get(Constants.PROP_NEXT_DEVICE,
                 SystemProperties.get(Constants.PROP_DEVICE));
-        return context.getString(R.string.menu_changelog_url, device);
+        return context.getString(R.string.menu_changelog_url, device)
+            .replace("{branch}", getNextBranchName());
+    }
+
+    private static String getServerUrlTemplate(Context context, String packageType) {
+        switch (packageType) {
+            case "GAPPS":
+                return context.getString(R.string.updater_server_url_gapps);
+            case "PICO":
+                return context.getString(R.string.updater_server_url_pico);
+            case "MINI":
+                return context.getString(R.string.updater_server_url_mini);
+            case "VANILLA":
+            default:
+                return context.getString(R.string.updater_server_url_vanilla);
+        }
+    }
+
+    private static String getNextBranchName() {
+        long buildDate = BuildInfoUtils.getBuildDateTimestamp();
+        if (buildDate <= 0) {
+            return "";
+        }
+
+        Calendar candidateDate = Calendar.getInstance(TimeZone.getTimeZone("UTC"), Locale.US);
+        candidateDate.setTimeInMillis(buildDate * 1000L);
+        candidateDate.add(Calendar.DAY_OF_YEAR, 1);
+        return BRANCH_DATE_FORMAT.format(candidateDate.getTime());
     }
 
     public static void triggerUpdate(Context context, String downloadId) {

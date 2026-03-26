@@ -493,50 +493,53 @@ public class UpdatesActivity extends UpdatesListActivity implements UpdateImport
     private void downloadUpdatesList(final boolean manualRefresh) {
         final File jsonFile = Utils.getCachedUpdateList(this);
         final File jsonFileTmp = new File(jsonFile.getAbsolutePath() + UUID.randomUUID());
-        String url = Utils.getServerURL(this);
-        Log.d(TAG, "Checking " + url);
-
-        DownloadClient.DownloadCallback callback = new DownloadClient.DownloadCallback() {
-            @Override
-            public void onFailure(final boolean cancelled) {
-                Log.e(TAG, "Could not download updates list");
-                runOnUiThread(() -> {
-                    if (!cancelled) {
-                        showSnackbar(R.string.snack_updates_check_failed, Snackbar.LENGTH_LONG);
-                    }
-                    refreshAnimationStop();
-                });
-            }
-
-            @Override
-            public void onResponse(DownloadClient.Headers headers) {
-            }
-
-            @Override
-            public void onSuccess() {
-                runOnUiThread(() -> {
-                    Log.d(TAG, "List downloaded");
-                    processNewJson(jsonFile, jsonFileTmp, manualRefresh);
-                    refreshAnimationStop();
-                });
-            }
-        };
-
-        final DownloadClient downloadClient;
-        try {
-            downloadClient = new DownloadClient.Builder()
-                    .setUrl(url)
-                    .setDestination(jsonFileTmp)
-                    .setDownloadCallback(callback)
-                    .build();
-        } catch (IOException exception) {
-            Log.e(TAG, "Could not build download client");
-            showSnackbar(R.string.snack_updates_check_failed, Snackbar.LENGTH_LONG);
-            return;
-        }
-
         refreshAnimationStart();
-        downloadClient.start();
+        new Thread(() -> {
+            try {
+                String url = Utils.getServerURL(this);
+                Log.d(TAG, "Checking " + url);
+
+                DownloadClient.DownloadCallback callback = new DownloadClient.DownloadCallback() {
+                    @Override
+                    public void onFailure(final boolean cancelled) {
+                        Log.e(TAG, "Could not download updates list");
+                        runOnUiThread(() -> {
+                            if (!cancelled) {
+                                showSnackbar(R.string.snack_updates_check_failed,
+                                        Snackbar.LENGTH_LONG);
+                            }
+                            refreshAnimationStop();
+                        });
+                    }
+
+                    @Override
+                    public void onResponse(DownloadClient.Headers headers) {
+                    }
+
+                    @Override
+                    public void onSuccess() {
+                        runOnUiThread(() -> {
+                            Log.d(TAG, "List downloaded");
+                            processNewJson(jsonFile, jsonFileTmp, manualRefresh);
+                            refreshAnimationStop();
+                        });
+                    }
+                };
+
+                DownloadClient downloadClient = new DownloadClient.Builder()
+                        .setUrl(url)
+                        .setDestination(jsonFileTmp)
+                        .setDownloadCallback(callback)
+                        .build();
+                downloadClient.start();
+            } catch (IOException exception) {
+                Log.e(TAG, "Could not fetch updates list", exception);
+                runOnUiThread(() -> {
+                    showSnackbar(R.string.snack_updates_check_failed, Snackbar.LENGTH_LONG);
+                    refreshAnimationStop();
+                });
+            }
+        }).start();
     }
 
     private void updateLastCheckedString() {

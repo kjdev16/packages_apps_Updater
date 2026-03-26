@@ -51,75 +51,83 @@ public class UpdatesCheckReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(final Context context, Intent intent) {
+        final Context appContext = context.getApplicationContext();
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
-            Utils.cleanupDownloadsDir(context);
+            Utils.cleanupDownloadsDir(appContext);
         }
 
         final SharedPreferences preferences =
-                PreferenceManager.getDefaultSharedPreferences(context);
+                PreferenceManager.getDefaultSharedPreferences(appContext);
 
-        if (!Utils.isUpdateCheckEnabled(context)) {
+        if (!Utils.isUpdateCheckEnabled(appContext)) {
             return;
         }
 
         if (Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
             // Set a repeating alarm on boot to check for new updates once per day
-            scheduleRepeatingUpdatesCheck(context);
+            scheduleRepeatingUpdatesCheck(appContext);
         }
 
-        if (!Utils.isNetworkAvailable(context)) {
-            Log.d(TAG, "Network not available, scheduling new check");
-            scheduleUpdatesCheck(context);
-            return;
-        }
-
-        final File json = Utils.getCachedUpdateList(context);
-        final File jsonNew = new File(json.getAbsolutePath() + UUID.randomUUID());
-        String url = Utils.getServerURL(context);
-        DownloadClient.DownloadCallback callback = new DownloadClient.DownloadCallback() {
-            @Override
-            public void onFailure(boolean cancelled) {
-                Log.e(TAG, "Could not download updates list, scheduling new check");
-                scheduleUpdatesCheck(context);
-            }
-
-            @Override
-            public void onResponse(DownloadClient.Headers headers) {
-            }
-
-            @Override
-            public void onSuccess() {
-                try {
-                    if (json.exists() && Utils.checkForNewUpdates(json, jsonNew)) {
-                        showNotification(context);
-                        updateRepeatingUpdatesCheck(context);
-                    }
-                    //noinspection ResultOfMethodCallIgnored
-                    jsonNew.renameTo(json);
-                    long currentMillis = System.currentTimeMillis();
-                    preferences.edit()
-                            .putLong(Constants.PREF_LAST_UPDATE_CHECK, currentMillis)
-                            .apply();
-                    // In case we set a one-shot check because of a previous failure
-                    cancelUpdatesCheck(context);
-                } catch (IOException | JSONException e) {
-                    Log.e(TAG, "Could not parse list, scheduling new check", e);
-                    scheduleUpdatesCheck(context);
+        final BroadcastReceiver.PendingResult pendingResult = goAsync();
+        new Thread(() -> {
+            try {
+                if (!Utils.isNetworkAvailable(appContext)) {
+                    Log.d(TAG, "Network not available, scheduling new check");
+                    scheduleUpdatesCheck(appContext);
+                    return;
                 }
-            }
-        };
 
-        try {
-            DownloadClient downloadClient = new DownloadClient.Builder()
-                    .setUrl(url)
-                    .setDestination(jsonNew)
-                    .setDownloadCallback(callback)
-                    .build();
-            downloadClient.start();
-        } catch (IOException e) {
-            Log.e(TAG, "Could not fetch list, scheduling new check", e);
-            scheduleUpdatesCheck(context);
-        }
+                final File json = Utils.getCachedUpdateList(appContext);
+                final File jsonNew = new File(json.getAbsolutePath() + UUID.randomUUID());
+                String url = Utils.getServerURL(appContext);
+                DownloadClient.DownloadCallback callback = new DownloadClient.DownloadCallback() {
+                    @Override
+                    public void onFailure(boolean cancelled) {
+                        Log.e(TAG, "Could not download updates list, scheduling new check");
+                        scheduleUpdatesCheck(appContext);
+                    }
+
+                    @Override
+                    public void onResponse(DownloadClient.Headers headers) {
+                    }
+
+                    @Override
+                    public void onSuccess() {
+                        try {
+                            if (json.exists() && Utils.checkForNewUpdates(json, jsonNew)) {
+                                showNotification(appContext);
+                                updateRepeatingUpdatesCheck(appContext);
+                            }
+                            //noinspection ResultOfMethodCallIgnored
+                            jsonNew.renameTo(json);
+                            long currentMillis = System.currentTimeMillis();
+                            preferences.edit()
+                                    .putLong(Constants.PREF_LAST_UPDATE_CHECK, currentMillis)
+                                    .apply();
+                            // In case we set a one-shot check because of a previous failure
+                            cancelUpdatesCheck(appContext);
+                        } catch (IOException | JSONException e) {
+                            Log.e(TAG, "Could not parse list, scheduling new check", e);
+                            scheduleUpdatesCheck(appContext);
+                        }
+                    }
+                };
+
+                try {
+                    DownloadClient downloadClient = new DownloadClient.Builder()
+                            .setUrl(url)
+                            .setDestination(jsonNew)
+                            .setDownloadCallback(callback)
+                            .build();
+                    downloadClient.start();
+                } catch (IOException e) {
+                    Log.e(TAG, "Could not fetch list, scheduling new check", e);
+                    scheduleUpdatesCheck(appContext);
+                }
+            } finally {
+                pendingResult.finish();
+            }
+        }).start();
     }
 
     private static void showNotification(Context context) {
